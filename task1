@@ -1,5 +1,5 @@
 SELECT mn.name, COUNT(u.id) AS upsale_total
   FROM upsale AS u
-	   FULL JOIN managers AS mn ON mn.id = u.manager_id
+       FULL JOIN managers AS mn ON mn.id = u.manager_id
  GROUP BY mn.name
  ORDER BY upsale_total DESC;
