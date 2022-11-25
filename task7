@@ -1,0 +1,24 @@
+-- 7. Предложить запрос, показывающий ранее не использованные операторы SQL.
+
+/* 
+Суть запроса: в компании решили разыграть подарок в честь дня рождения компании. 
+Среди тех, сотрудников, у кого в имени есть одна из букв lucky случайным образом выбирается победитель.
+*/
+
+WITH
+     lucky_list AS
+    (SELECT name, RANK() OVER (ORDER BY name) AS ticket_number
+       FROM managers 
+		  WHERE LOWER(name) LIKE '%l%_' OR  
+			      LOWER(name) LIKE '%u%_' OR
+  	   	    LOWER(name) LIKE '%c%_' OR
+ 		        LOWER(name) LIKE '%k%_' OR
+      		  LOWER(name) LIKE '%y%_'),
+      
+	    winner_number AS
+     (SELECT trunc(RANDOM() * MAX(ticket_number) + MIN(ticket_number)) AS winner_number
+		    FROM lucky_list)
+
+SELECT name AS winner
+  FROM lucky_list, winner_number
+ WHERE ticket_number = winner_number
