@@ -15,9 +15,9 @@ WITH
  	    LOWER(name) LIKE '%k%_' OR
             LOWER(name) LIKE '%y%_'),
       
-      winner_number AS
-     (SELECT trunc(RANDOM() * MAX(ticket_number) + MIN(ticket_number)) AS winner_number
-        FROM lucky_list)
+     winner_number AS
+    (SELECT trunc(RANDOM() * MAX(ticket_number) + MIN(ticket_number)) AS winner_number
+       FROM lucky_list)
 
 SELECT name AS winner
   FROM lucky_list, winner_number
