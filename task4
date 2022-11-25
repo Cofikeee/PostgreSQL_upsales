@@ -1,3 +1,5 @@
+-- 4. Вывести офисы, отсортированные в порядке убывания средней конверсии менеджеров из офиса за всю историю.
+
 WITH     
      positive_per_manager AS 
 	  (SELECT manager_id, COUNT(result) AS positive
