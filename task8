@@ -45,4 +45,5 @@ WITH
        
  SELECT bpm.name, bpm.ranking, TO_CHAR(TO_DATE(bpm.month_num::TEXT, 'MM'), 'Month') AS month_name
    FROM best_per_month AS bpm
-        JOIN managers AS mn ON bpm.name = mn.name;
+        JOIN managers AS mn ON bpm.name = mn.name
+  ORDER BY bpm.month_num, bpm.ranking;
