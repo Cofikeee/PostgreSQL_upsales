@@ -1,0 +1,48 @@
+-- 8. Предложить запрос, который покажет интересную или полезную информацию из этих данных.
+
+/*
+Суть запроса: определяем сотрудника месяца. На каждый месяц рассчитывается количество успешных upsalov’ов для каждого менеджера. 
+Сотрудником месяца становится тот, кто набрал больше всего. 
+В случае, если есть 2 и больше таких сотрудников (например, 3 человека сделали по 10 успешных upsal’ов каждый), 
+выбирается тот, чья конверсия в этом месяце выше, остальные тоже получают вознаграждение, но меньше (для этого в таблице есть ранкинг). 
+При желании можно вывести и количество сделок, и конверсию, тут только определяется победитель.
+*/
+
+WITH
+	   total_per_month AS 
+    (SELECT mn.id, EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num, COUNT(result) AS total_upsales
+	     FROM upsale AS u JOIN managers AS mn ON u.manager_id = mn.id
+      GROUP BY month_num, mn.id),
+
+	   positive_per_month AS
+	  (SELECT mn.id, EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num, COUNT(result) AS total_positive
+	     FROM upsale AS u JOIN managers AS mn ON u.manager_id = mn.id
+      WHERE result = 'yes'
+      GROUP BY month_num, mn.id),
+      
+	   positive_and_total AS
+	  (SELECT pmp.id, pmp.month_num, pmp.total_positive, tpm.total_upsales
+       FROM positive_per_month AS pmp 
+     	 JOIN total_per_month AS tpm ON pmp.id = tpm.id),
+	
+	   conversion_per_month AS
+    (SELECT mn.name, pat.month_num, pat.total_positive, ROUND(CAST(pat.total_positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
+ 	     FROM positive_and_total AS pat
+       JOIN managers AS mn ON mn.id = pat.id),
+
+     max_per_month AS  
+    (SELECT month_num, MAX(total_positive) AS max_positive
+       FROM positive_per_month AS ppm
+      GROUP BY month_num),
+	
+     best_per_month AS 
+    (SELECT cpm.name, cpm.month_num, cpm.total_positive, cpm.conversion_percent, RANK() OVER (ORDER BY cpm.conversion_percent DESC) AS ranking
+  	   FROM conversion_per_month AS cpm, max_per_month AS mpm
+      WHERE cpm.total_positive = mpm.max_positive 
+	          AND cpm.month_num = mpm.month_num 
+      GROUP BY cpm.name, cpm.month_num, cpm.total_positive, cpm.conversion_percent)
+       
+       
+ SELECT bpm.name, bpm.ranking, TO_CHAR(TO_DATE(bpm.month_num::TEXT, 'MM'), 'Month') AS month_name
+   FROM best_per_month AS bpm
+   JOIN managers AS mn ON bpm.name = mn.name;
