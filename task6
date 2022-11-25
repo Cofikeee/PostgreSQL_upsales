@@ -1,0 +1,8 @@
+-- 6. Получить для каждого менеджера первое принятое предложение.
+
+SELECT mn.name, MIN(to_date(dt, 'DD.MM.YYYY')) AS first_result
+  FROM managers AS mn
+       FULL JOIN upsale AS u ON mn.id = u.manager_id
+ WHERE u.result = 'yes'
+ GROUP BY mn.name
+ ORDER BY first_result;
