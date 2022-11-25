@@ -12,4 +12,4 @@ WITH
         
 SELECT name, call_number
   FROM result_table
- WHERE result = 'yes' AND previous_result = 'no'
+ WHERE result = 'yes' AND previous_result = 'no';
