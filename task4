@@ -1,0 +1,23 @@
+WITH     
+     positive_per_manager AS 
+	  (SELECT manager_id, COUNT(result) AS positive
+	     FROM upsale AS u
+	    WHERE result = 'yes'
+	    GROUP BY manager_id),
+    
+	   positive_and_total AS
+    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
+	     FROM upsale AS u
+	          FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
+	    GROUP BY u.manager_id, ppm.positive),
+     
+     conversion_per_manager AS
+    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
+ 	     FROM positive_and_total AS pat
+            JOIN managers AS mn ON mn.id = pat.manager_id)
+      
+SELECT mn.office, COUNT(DISTINCT mn.id) AS total_managers, ROUND(AVG(COALESCE(cpm.conversion_percent, 0.00)), 2) AS avg_conversion_percent
+  FROM conversion_per_manager AS cpm 
+       FULL JOIN managers AS mn ON cpm.name = mn.name
+ GROUP BY mn.office
+ ORDER BY avg_conversion_percent DESC;
