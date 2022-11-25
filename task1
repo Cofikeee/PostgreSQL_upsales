@@ -1,3 +1,5 @@
+-- 1. Отобразить сколько предложений сделал каждый из менеджеров за всю историю.
+
 SELECT mn.name, COUNT(u.id) AS upsale_total
   FROM upsale AS u
        FULL JOIN managers AS mn ON mn.id = u.manager_id
