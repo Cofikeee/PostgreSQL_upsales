@@ -21,4 +21,4 @@ WITH
 
 SELECT name AS winner
   FROM lucky_list, winner_number
- WHERE ticket_number = winner_number
+ WHERE ticket_number = winner_number;
