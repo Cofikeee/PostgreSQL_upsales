@@ -1,11 +1,10 @@
-2. Отобразить конверсию предложений в подключения для менеджеров за указанный
-период времени.
+-- 2. Отобразить конверсию предложений в подключения для менеджеров за указанный период времени.
 
 DROP TABLE IF EXISTS date_range;
   
 CREATE TABLE date_range(
-       date_min DATE,
-       date_max DATE);
+                        date_min DATE,
+                        date_max DATE);
        
 INSERT INTO date_range(date_min, date_max)
 VALUES ('2000-01-01', '2023-12-31');               -- ДАТЫ ИССЛЕДОВАНИЯ
