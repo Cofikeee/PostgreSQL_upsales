@@ -1,40 +1,272 @@
--- Script to create the Product table and load data into it.
+---------------------------------------------------------------
+-- Скрипт для создания таблицы managers и наполнения ее данными.
 
-DROP TABLE product;
-CREATE TABLE product
-( 
-    product_category varchar(255),
-    brand varchar(255),
-    product_name varchar(255),
-    price int
+DROP TABLE IF EXISTS managers;
+DROP TABLE IF EXISTS upsale;
+
+CREATE TABLE managers
+(
+    id SERIAL   PRIMARY KEY,
+    login       VARCHAR(60),
+    name        VARCHAR(200),
+    office      INTEGER
 );
 
-INSERT INTO product VALUES
-('Phone', 'Apple', 'iPhone 12 Pro Max', 1300),
-('Phone', 'Apple', 'iPhone 12 Pro', 1100),
-('Phone', 'Apple', 'iPhone 12', 1000),
-('Phone', 'Samsung', 'Galaxy Z Fold 3', 1800),
-('Phone', 'Samsung', 'Galaxy Z Flip 3', 1000),
-('Phone', 'Samsung', 'Galaxy Note 20', 1200),
-('Phone', 'Samsung', 'Galaxy S21', 1000),
-('Phone', 'OnePlus', 'OnePlus Nord', 300),
-('Phone', 'OnePlus', 'OnePlus 9', 800),
-('Phone', 'Google', 'Pixel 5', 600),
-('Laptop', 'Apple', 'MacBook Pro 13', 2000),
-('Laptop', 'Apple', 'MacBook Air', 1200),
-('Laptop', 'Microsoft', 'Surface Laptop 4', 2100),
-('Laptop', 'Dell', 'XPS 13', 2000),
-('Laptop', 'Dell', 'XPS 15', 2300),
-('Laptop', 'Dell', 'XPS 17', 2500),
-('Earphone', 'Apple', 'AirPods Pro', 280),
-('Earphone', 'Samsung', 'Galaxy Buds Pro', 220),
-('Earphone', 'Samsung', 'Galaxy Buds Live', 170),
-('Earphone', 'Sony', 'WF-1000XM4', 250),
-('Headphone', 'Sony', 'WH-1000XM4', 400),
-('Headphone', 'Apple', 'AirPods Max', 550),
-('Headphone', 'Microsoft', 'Surface Headphones 2', 250),
-('Smartwatch', 'Apple', 'Apple Watch Series 6', 1000),
-('Smartwatch', 'Apple', 'Apple Watch SE', 400),
-('Smartwatch', 'Samsung', 'Galaxy Watch 4', 600),
-('Smartwatch', 'OnePlus', 'OnePlus Watch', 220);
+INSERT INTO managers(login, name, office) VALUES
+
+('hemp','Hemp A',4),
+('jool','Jolly A',5),
+('hobert','Hobert F',5),
+('frankjr','Gotty F',7),
+('aleensr','Allen D',1),
+('goofy','Goofy M',8),
+('duckduck','Muddy W',8);
+
+-------------------------------------------------------------
+-- Скрипт для создания таблицы upsale и наполнения ее данными.
+
+CREATE TABLE upsale
+(
+    id SERIAL   PRIMARY KEY,
+    dt          VARCHAR(60),
+    manager_id  VARCHAR(200),
+    client_id   INTEGER,
+    call_id     INTEGER,
+    factor_id   INTEGER,
+    result      BOOLEAN
+);
+
+INSERT INTO upsale(dt, manager_id, client_id, call_id, factor_id, RESULT) VALUES
+
+('01.02.2017',7,123,3,2,'no'),
+('03.02.2017',7,90,9,1,'yes'),
+('02.02.2017',5,678,5,4,'yes'),
+('04.02.2017',5,734,12,2,'yes'),
+('02.02.2017',4,890,6,2,'no'),
+('01.02.2017',3,67,2,1,'no'),
+('04.02.2017',3,678,11,5,'yes'),
+('03.02.2017',2,123,7,3,'yes'),
+('03.02.2017',2,45,8,2,'no'),
+('01.02.2017',1,45,1,1,'yes'),
+('01.02.2017',1,45,4,4,'no'),
+('04.02.2017',1,893,10,4,'yes');
+
 COMMIT;
+
+-------------------------------------------------------------------------------
+-- 1. Отобразить сколько предложений сделал каждый из менеджеров за всю историю.
+
+SELECT mn.name, COUNT(u.id) AS upsale_total
+  FROM upsale AS u
+       FULL JOIN managers AS mn ON mn.id = CAST(u.manager_id AS INTEGER)
+ GROUP BY mn.name
+ ORDER BY upsale_total DESC;
+ 
+ -----------------------------------------------------------------------------------------------
+ -- 2. Отобразить конверсию предложений в подключения для менеджеров за указанный период времени.
+
+DROP TABLE IF EXISTS date_range;
+  
+CREATE TABLE date_range(date_min DATE,
+                        date_max DATE);
+       
+INSERT INTO date_range(date_min, date_max)
+VALUES ('2000-01-01', '2023-12-31');               -- ДАТЫ ИССЛЕДОВАНИЯ
+       
+WITH     
+     positive_per_manager AS 
+    (SELECT manager_id, COUNT(result) AS positive
+       FROM upsale AS u, date_range AS dr 
+      WHERE result = 'yes'
+            AND to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
+      GROUP BY manager_id),
+    
+     positive_and_total AS
+    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
+       FROM date_range AS dr, upsale AS u
+            FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
+      WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
+      GROUP BY u.manager_id, ppm.positive),
+     
+     conversion_per_manager AS
+    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
+       FROM positive_and_total AS pat
+       JOIN managers AS mn ON mn.id = CAST(pat.manager_id AS INTEGER)
+)
+      
+SELECT mn.name, COALESCE(cpm.conversion_percent, 0.00) AS conversion_percent
+  FROM conversion_per_manager AS cpm 
+  FULL JOIN managers AS mn ON cpm.name = mn.name
+ ORDER BY conversion_percent DESC;
+
+DROP TABLE IF EXISTS date_range;
+
+ -----------------------------------------------------------------------------------------------------
+ -- 3. Вывести конверсии тех менеджеров, у которых было больше 100 звонков за указанный период времени.
+
+DROP TABLE IF EXISTS date_range;
+  
+CREATE TABLE date_range(date_min DATE,
+       			        date_max DATE);
+       
+INSERT INTO date_range(date_min, date_max)
+VALUES ('2000-01-01', '2023-12-31');               -- ДАТЫ ИССЛЕДОВАНИЯ
+       
+WITH     
+     positive_per_manager AS 
+    (SELECT manager_id, COUNT(result) AS positive
+       FROM upsale AS u, date_range AS dr
+      WHERE result = 'yes'
+            AND to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
+      GROUP BY manager_id),
+     
+     positive_and_total AS
+    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
+       FROM date_range AS dr, upsale AS u
+	    FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
+      WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
+      GROUP BY u.manager_id, ppm.positive),
+     
+     conversion_per_manager AS
+    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
+       FROM positive_and_total AS pat
+            JOIN managers AS mn ON mn.id = CAST(pat.manager_id AS INTEGER))
+    
+SELECT mn.name, COALESCE(cpm.conversion_percent, 0.00) AS conversion_percent
+  FROM conversion_per_manager AS cpm 
+       FULL JOIN managers AS mn ON cpm.name = mn.name
+ WHERE cpm.manager_id IN (
+                          SELECT manager_id
+			    FROM upsale
+                           GROUP BY manager_id
+			  HAVING COUNT(call_id) > 100);  
+                          
+ DROP TABLE IF EXISTS date_range;
+ 
+ ------------------------------------------------------------------------------------------------------------
+ -- 4. Вывести офисы, отсортированные в порядке убывания средней конверсии менеджеров из офиса за всю историю.
+
+WITH     
+     positive_per_manager AS 
+	  (SELECT manager_id, COUNT(result) AS positive
+	     FROM upsale AS u
+	    WHERE result = 'yes'
+	    GROUP BY manager_id),
+    
+	   positive_and_total AS
+    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
+	     FROM upsale AS u
+	          FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
+	    GROUP BY u.manager_id, ppm.positive),
+     
+     conversion_per_manager AS
+    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
+ 	     FROM positive_and_total AS pat
+            JOIN managers AS mn ON mn.id = CAST(pat.manager_id AS INTEGER))
+      
+SELECT mn.office, COUNT(DISTINCT mn.id) AS total_managers, ROUND(AVG(COALESCE(cpm.conversion_percent, 0.00)), 2) AS avg_conversion_percent
+  FROM conversion_per_manager AS cpm 
+       FULL JOIN managers AS mn ON cpm.name = mn.name
+ GROUP BY mn.office
+ ORDER BY avg_conversion_percent DESC;
+
+-----------------------------------------------------------------------------------------------------------------------------
+-- 5. Вывести минимальный порядковый номер звонка клиента с RESULT = Yes, перед которым был RESULT = No для каждого менеджера.
+
+WITH
+     result_table AS  
+    (SELECT mn.name, 
+            to_date(u.dt, 'DD.MM.YYYY'),
+	    ROW_NUMBER() OVER (PARTITION BY u.manager_id ORDER BY mn.name) AS call_number,
+      	    u.result,
+       	    LAG(result) OVER (PARTITION BY u.manager_id ORDER BY mn.name) AS previous_result
+       FROM upsale AS u 
+  	    JOIN managers AS mn ON mn.id = CAST(u.manager_id AS INTEGER))
+        
+SELECT name, call_number
+  FROM result_table
+ WHERE result = 'yes' AND previous_result = 'no';
+ 
+ ----------------------------------------------------------------
+ -- 6. Получить для каждого менеджера первое принятое предложение.
+
+SELECT mn.name, MIN(to_date(dt, 'DD.MM.YYYY')) AS first_result
+  FROM managers AS mn
+       FULL JOIN upsale AS u ON mn.id = CAST(u.manager_id AS INTEGER)
+ WHERE u.result = 'yes'
+ GROUP BY mn.name
+ ORDER BY first_result;
+ 
+ ---------------------------------------------------------------------------
+ -- 7. Предложить запрос, показывающий ранее не использованные операторы SQL.
+
+/* 
+Суть запроса: в компании решили разыграть подарок в честь дня рождения компании. 
+Среди тех, сотрудников, у кого в имени есть одна из букв lucky случайным образом выбирается победитель.
+*/
+
+WITH
+     lucky_list AS
+    (SELECT name, RANK() OVER (ORDER BY name) AS ticket_number
+       FROM managers 
+      WHERE LOWER(name) SIMILAR TO '%(l|u|c|k|y)%_'),
+      
+     winner_number AS
+    (SELECT trunc(RANDOM() * MAX(ticket_number) + MIN(ticket_number)) AS winner_number
+       FROM lucky_list)
+
+SELECT name AS winner
+  FROM lucky_list, winner_number
+ WHERE ticket_number = winner_number;
+ 
+------------------------------------------------------------------------------------------
+-- 8. Предложить запрос, который покажет интересную или полезную информацию из этих данных.
+
+/*
+Суть запроса: определяем сотрудника месяца. На каждый месяц рассчитывается количество успешных upsalov’ов для каждого менеджера. 
+Сотрудником месяца становится тот, кто набрал больше всего. 
+В случае, если есть 2 и больше таких сотрудников (например, 3 человека сделали по 10 успешных upsal’ов каждый), 
+выбирается тот, чья конверсия в этом месяце выше, остальные тоже получают вознаграждение, но меньше (для этого в таблице есть ранкинг). 
+При желании можно вывести и количество сделок, и конверсию, тут только определяется победитель.
+*/
+
+WITH
+     total_per_month AS 
+    (SELECT mn.id, EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num, COUNT(result) AS total_upsales
+       FROM upsale AS u JOIN managers AS mn ON CAST(u.manager_id AS INTEGER) = mn.id
+      GROUP BY month_num, mn.id),
+
+     positive_per_month AS
+    (SELECT mn.id, EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num, COUNT(result) AS total_positive
+       FROM upsale AS u JOIN managers AS mn ON CAST(u.manager_id AS INTEGER) = mn.id
+      WHERE result = 'yes'
+      GROUP BY month_num, mn.id),
+      
+     positive_and_total AS
+    (SELECT pmp.id, pmp.month_num, pmp.total_positive, tpm.total_upsales
+       FROM positive_per_month AS pmp 
+     	    JOIN total_per_month AS tpm ON pmp.id = tpm.id),
+	
+     conversion_per_month AS
+    (SELECT mn.name, pat.month_num, pat.total_positive, ROUND(CAST(pat.total_positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
+       FROM positive_and_total AS pat
+            JOIN managers AS mn ON mn.id = pat.id),
+
+     max_per_month AS  
+    (SELECT month_num, MAX(total_positive) AS max_positive
+       FROM positive_per_month AS ppm
+      GROUP BY month_num),
+	
+     best_per_month AS 
+    (SELECT cpm.name, cpm.month_num, cpm.total_positive, cpm.conversion_percent, RANK() OVER (ORDER BY cpm.conversion_percent DESC) AS ranking
+       FROM conversion_per_month AS cpm, max_per_month AS mpm
+      WHERE cpm.total_positive = mpm.max_positive 
+	    AND cpm.month_num = mpm.month_num 
+      GROUP BY cpm.name, cpm.month_num, cpm.total_positive, cpm.conversion_percent)
+       
+       
+ SELECT bpm.name, bpm.ranking, TO_CHAR(TO_DATE(bpm.month_num::TEXT, 'MM'), 'Month') AS month_name
+   FROM best_per_month AS bpm
+        JOIN managers AS mn ON bpm.name = mn.name
+  ORDER BY bpm.month_num, bpm.ranking;
+ 
