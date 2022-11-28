@@ -36,7 +36,7 @@ CREATE TABLE upsale
     result      BOOLEAN
 );
 
-INSERT INTO upsale(dt, manager_id, client_id, call_id, factor_id, RESULT) VALUES
+INSERT INTO upsale(dt, manager_id, client_id, call_id, factor_id, result) VALUES
 
 ('01.02.2017',7,123,3,2,'no'),
 ('03.02.2017',7,90,9,1,'yes'),
@@ -148,20 +148,20 @@ SELECT mn.name, COALESCE(cpm.conversion_percent, 0.00) AS conversion_percent
 
 WITH     
      positive_per_manager AS 
-	  (SELECT manager_id, COUNT(result) AS positive
-	     FROM upsale AS u
-	    WHERE result = 'yes'
-	    GROUP BY manager_id),
+    (SELECT manager_id, COUNT(result) AS positive
+       FROM upsale AS u
+      WHERE result = 'yes'
+      GROUP BY manager_id),
     
-	   positive_and_total AS
+     positive_and_total AS
     (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
-	     FROM upsale AS u
-	          FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
-	    GROUP BY u.manager_id, ppm.positive),
+       FROM upsale AS u
+	    FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
+      GROUP BY u.manager_id, ppm.positive),
      
      conversion_per_manager AS
     (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
- 	     FROM positive_and_total AS pat
+       FROM positive_and_total AS pat
             JOIN managers AS mn ON mn.id = CAST(pat.manager_id AS INTEGER))
       
 SELECT mn.office, COUNT(DISTINCT mn.id) AS total_managers, ROUND(AVG(COALESCE(cpm.conversion_percent, 0.00)), 2) AS avg_conversion_percent
