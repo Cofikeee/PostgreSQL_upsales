@@ -120,6 +120,7 @@ SELECT mn.office, ROUND(AVG(COALESCE(mc.conversion_percent, 0))) AS avg_conversi
 -----------------------------------------------------------------------------------------------------------------------------
 -- 5. Вывести минимальный порядковый номер звонка клиента с RESULT = Yes, перед которым был RESULT = No для каждого менеджера.
 -- Исправил ошибку с ORDER BY, оконку сделал через алиас.
+
 WITH
      result_table AS  
     (SELECT manager_id, to_date(dt, 'DD.MM.YYYY'), result,
