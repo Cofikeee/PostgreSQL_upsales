@@ -55,6 +55,7 @@ COMMIT;
 
 -------------------------------------------------------------------------------
 -- 1. Отобразить сколько предложений сделал каждый из менеджеров за всю историю.
+-- Без изменений.
 
 SELECT mn.name, COUNT(u.id) AS upsale_total
   FROM upsale AS u
@@ -64,132 +65,77 @@ SELECT mn.name, COUNT(u.id) AS upsale_total
  
  -----------------------------------------------------------------------------------------------
  -- 2. Отобразить конверсию предложений в подключения для менеджеров за указанный период времени.
-
+ -- Убрал ненужные CTE, убрал JOIN с таблицей менеджеров (менеджера с 0 звонков), сократил на 21 строку.
+ 
 DROP TABLE IF EXISTS date_range;
   
 CREATE TABLE date_range(date_min DATE,
                         date_max DATE);
        
 INSERT INTO date_range(date_min, date_max)
-VALUES ('2000-01-01', '2023-12-31');               -- ДАТЫ ИССЛЕДОВАНИЯ
-       
-WITH     
-     positive_per_manager AS 
-    (SELECT manager_id, COUNT(result) AS positive
-       FROM upsale AS u, date_range AS dr 
-      WHERE result = 'yes'
-            AND to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
-      GROUP BY manager_id),
-    
-     positive_and_total AS
-    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
-       FROM date_range AS dr, upsale AS u
-            FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
-      WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
-      GROUP BY u.manager_id, ppm.positive),
-     
-     conversion_per_manager AS
-    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
-       FROM positive_and_total AS pat
-       JOIN managers AS mn ON mn.id = CAST(pat.manager_id AS INTEGER)
-)
-      
-SELECT mn.name, COALESCE(cpm.conversion_percent, 0.00) AS conversion_percent
-  FROM conversion_per_manager AS cpm 
-  FULL JOIN managers AS mn ON cpm.name = mn.name
- ORDER BY conversion_percent DESC;
+VALUES ('2000-01-01', '2023-12-31');                            -- Указать дату здесь
+
+SELECT u.manager_id,  SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_percent
+  FROM date_range AS dr, upsale AS u
+ WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
+ GROUP BY u.manager_id;
 
 DROP TABLE IF EXISTS date_range;
 
  -----------------------------------------------------------------------------------------------------
  -- 3. Вывести конверсии тех менеджеров, у которых было больше 100 звонков за указанный период времени.
-
+ -- Убрал ненужные CTE, убрал JOIN с таблицей менеджеров (менеджера с 0 звонков), сократил на 23 строки.
+ 
 DROP TABLE IF EXISTS date_range;
   
 CREATE TABLE date_range(date_min DATE,
-       			        date_max DATE);
+                        date_max DATE);
        
 INSERT INTO date_range(date_min, date_max)
-VALUES ('2000-01-01', '2023-12-31');               -- ДАТЫ ИССЛЕДОВАНИЯ
-       
-WITH     
-     positive_per_manager AS 
-    (SELECT manager_id, COUNT(result) AS positive
-       FROM upsale AS u, date_range AS dr
-      WHERE result = 'yes'
-            AND to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
-      GROUP BY manager_id),
-     
-     positive_and_total AS
-    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
-       FROM date_range AS dr, upsale AS u
-	    FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
-      WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
-      GROUP BY u.manager_id, ppm.positive),
-     
-     conversion_per_manager AS
-    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
-       FROM positive_and_total AS pat
-            JOIN managers AS mn ON mn.id = CAST(pat.manager_id AS INTEGER))
-    
-SELECT mn.name, COALESCE(cpm.conversion_percent, 0.00) AS conversion_percent
-  FROM conversion_per_manager AS cpm 
-       FULL JOIN managers AS mn ON cpm.name = mn.name
- WHERE cpm.manager_id IN (
-                          SELECT manager_id
-			    FROM upsale
-                           GROUP BY manager_id
-			  HAVING COUNT(call_id) > 100);  
-                          
- DROP TABLE IF EXISTS date_range;
+VALUES ('2000-01-01', '2023-12-31');                            -- Указать дату здесь
+
+SELECT u.manager_id,  SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_percent
+  FROM date_range AS dr, upsale AS u
+ WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
+ GROUP BY u.manager_id
+HAVING COUNT(call_id) > 100;                                    -- Количество звонков
+
+DROP TABLE IF EXISTS date_range;
  
  ------------------------------------------------------------------------------------------------------------
  -- 4. Вывести офисы, отсортированные в порядке убывания средней конверсии менеджеров из офиса за всю историю.
-
-WITH     
-     positive_per_manager AS 
-    (SELECT manager_id, COUNT(result) AS positive
+ -- Убрал ненужные CTE, (FULL -> LEFT) JOIN, чтобы убрать менеджера с 0 звонков. Сократил на 13 строк.
+ 
+WITH 
+     managers_conversion AS
+    (SELECT u.manager_id,  SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_percent
        FROM upsale AS u
-      WHERE result = 'yes'
-      GROUP BY manager_id),
-    
-     positive_and_total AS
-    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
-       FROM upsale AS u
-	    FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
-      GROUP BY u.manager_id, ppm.positive),
-     
-     conversion_per_manager AS
-    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
-       FROM positive_and_total AS pat
-            JOIN managers AS mn ON mn.id = CAST(pat.manager_id AS INTEGER))
+      GROUP BY u.manager_id)
       
-SELECT mn.office, COUNT(DISTINCT mn.id) AS total_managers, ROUND(AVG(COALESCE(cpm.conversion_percent, 0.00)), 2) AS avg_conversion_percent
-  FROM conversion_per_manager AS cpm 
-       FULL JOIN managers AS mn ON cpm.name = mn.name
+SELECT mn.office, ROUND(AVG(COALESCE(mc.conversion_percent, 0.00)), 2) AS avg_conversion_percent
+  FROM managers_conversion AS mc
+       LEFT JOIN managers AS mn ON cast(mc.manager_id as NUMERIC) = mn.id
  GROUP BY mn.office
  ORDER BY avg_conversion_percent DESC;
 
 -----------------------------------------------------------------------------------------------------------------------------
 -- 5. Вывести минимальный порядковый номер звонка клиента с RESULT = Yes, перед которым был RESULT = No для каждого менеджера.
-
+-- Исправил ошибку с ORDER BY, оконку сделал через алиас.
 WITH
      result_table AS  
-    (SELECT mn.name, 
-            to_date(u.dt, 'DD.MM.YYYY'),
-	    ROW_NUMBER() OVER (PARTITION BY u.manager_id ORDER BY mn.name) AS call_number,
-      	    u.result,
-       	    LAG(result) OVER (PARTITION BY u.manager_id ORDER BY to_date(u.dt, 'DD.MM.YYYY')) AS previous_result
-       FROM upsale AS u 
-  	    JOIN managers AS mn ON mn.id = CAST(u.manager_id AS INTEGER))
+    (SELECT manager_id, to_date(dt, 'DD.MM.YYYY'), result,
+	    ROW_NUMBER() OVER w AS call_number,
+       	    LAG(result) OVER w AS previous_result
+       FROM upsale
+     WINDOW w as (PARTITION BY manager_id ORDER BY to_date(dt, 'DD.MM.YYYY')))
         
-SELECT name, call_number
+SELECT manager_id, call_number
   FROM result_table
  WHERE result = 'yes' AND previous_result = 'no';
  
  ----------------------------------------------------------------
  -- 6. Получить для каждого менеджера первое принятое предложение.
-
+ -- Без изменений.
 SELECT mn.name, MIN(to_date(dt, 'DD.MM.YYYY')) AS first_result
   FROM managers AS mn
        FULL JOIN upsale AS u ON mn.id = CAST(u.manager_id AS INTEGER)
@@ -199,7 +145,8 @@ SELECT mn.name, MIN(to_date(dt, 'DD.MM.YYYY')) AS first_result
  
  ---------------------------------------------------------------------------
  -- 7. Предложить запрос, показывающий ранее не использованные операторы SQL.
-
+ -- Без изменений.
+ 
 /* 
 Суть запроса: в компании решили разыграть подарок в честь дня рождения компании. 
 Среди тех, сотрудников, у кого в имени есть одна из букв lucky случайным образом выбирается победитель.
@@ -221,6 +168,7 @@ SELECT name AS winner
  
 ------------------------------------------------------------------------------------------
 -- 8. Предложить запрос, который покажет интересную или полезную информацию из этих данных.
+
 
 /*
 Суть запроса: определяем сотрудника месяца. На каждый месяц рассчитывается количество успешных upsalov’ов для каждого менеджера. 
