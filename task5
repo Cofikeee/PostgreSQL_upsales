@@ -2,14 +2,12 @@
 
 WITH
      result_table AS  
-    (SELECT mn.name, 
-            to_date(u.dt, 'DD.MM.YYYY'),
-	    ROW_NUMBER() OVER (PARTITION BY u.manager_id ORDER BY mn.name) AS call_number,
-      	    u.result,
-       	    LAG(result) OVER (PARTITION BY u.manager_id ORDER BY mn.name) AS previous_result
-       FROM upsale AS u 
-  	    JOIN managers AS mn ON mn.id = u.manager_id)
+    (SELECT manager_id, to_date(dt, 'DD.MM.YYYY'), result,
+	        ROW_NUMBER() OVER w AS call_number,
+       	    LAG(result) OVER w AS previous_result
+	 FROM upsale 
+	 WINDOW w as (PARTITION BY manager_id ORDER BY to_date(dt, 'DD.MM.YYYY')))
         
-SELECT name, call_number
+SELECT manager_id, call_number
   FROM result_table
  WHERE result = 'yes' AND previous_result = 'no';
