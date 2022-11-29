@@ -1,4 +1,4 @@
--- 3. Вывести конверсии тех менеджеров, у которых было больше 100 звонков за указанный период времени.
+ -- 3. Вывести конверсии тех менеджеров, у которых было больше 100 звонков за указанный период времени.
 
 DROP TABLE IF EXISTS date_range;
   
@@ -12,6 +12,6 @@ SELECT u.manager_id,  SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / CO
 FROM date_range AS dr, upsale AS u
 WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
 GROUP BY u.manager_id
-HAVING COUNT(call_id) > 100;
+HAVING COUNT(call_id) > 100;                                    -- Количество звонков
 
 DROP TABLE IF EXISTS date_range;
