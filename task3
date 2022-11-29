@@ -2,40 +2,16 @@
 
 DROP TABLE IF EXISTS date_range;
   
-CREATE TABLE date_range(
-       			date_min DATE,
-       			date_max DATE);
+CREATE TABLE date_range(date_min DATE,
+                        date_max DATE);
        
 INSERT INTO date_range(date_min, date_max)
-VALUES ('2000-01-01', '2023-12-31');               -- ДАТЫ ИССЛЕДОВАНИЯ
-       
-WITH     
-     positive_per_manager AS 
-    (SELECT manager_id, COUNT(result) AS positive
-       FROM upsale AS u, date_range AS dr
-      WHERE result = 'yes'
-            AND to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
-      GROUP BY manager_id),
-     
-     positive_and_total AS
-    (SELECT u.manager_id, COUNT(result) AS total_upsales, COALESCE(ppm.positive, 0) AS positive
-       FROM date_range AS dr, upsale AS u
-	    FULL JOIN positive_per_manager AS ppm ON u.manager_id = ppm.manager_id
-      WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
-      GROUP BY u.manager_id, ppm.positive),
-     
-     conversion_per_manager AS
-    (SELECT pat.manager_id, mn.name, ROUND(CAST(pat.positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
-       FROM positive_and_total AS pat
-            JOIN managers AS mn ON mn.id = pat.manager_id)
-    
-SELECT mn.name, COALESCE(cpm.conversion_percent, 0.00) AS conversion_percent
-  FROM conversion_per_manager AS cpm 
-       FULL JOIN managers AS mn ON cpm.name = mn.name
- WHERE cpm.manager_id IN (
-                          SELECT manager_id
-			    FROM upsale
-                           GROUP BY manager_id
-			  HAVING COUNT(call_id) > 100);  
-                          
- DROP TABLE IF EXISTS date_range;
+VALUES ('2000-01-01', '2023-12-31');                            -- Указать дату здесь
+
+SELECT u.manager_id,  SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_percent
+FROM date_range AS dr, upsale AS u
+WHERE to_date(dt, 'DD.MM.YYYY') BETWEEN dr.date_min AND dr.date_max
+GROUP BY u.manager_id
+HAVING COUNT(call_id) > 100;
+
+DROP TABLE IF EXISTS date_range;
