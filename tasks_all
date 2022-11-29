@@ -55,12 +55,11 @@ COMMIT;
 
 -------------------------------------------------------------------------------
 -- 1. Отобразить сколько предложений сделал каждый из менеджеров за всю историю.
--- Без изменений.
+-- Убрал JOIN с менеджерами.
 
-SELECT mn.name, COUNT(u.id) AS upsale_total
-  FROM upsale AS u
-       FULL JOIN managers AS mn ON mn.id = CAST(u.manager_id AS INTEGER)
- GROUP BY mn.name
+SELECT manager_id, COUNT(id) AS upsale_total
+  FROM upsale
+ GROUP BY manager_id
  ORDER BY upsale_total DESC;
  
  -----------------------------------------------------------------------------------------------
@@ -112,7 +111,7 @@ WITH
        FROM upsale AS u
       GROUP BY u.manager_id)
       
-SELECT mn.office, ROUND(AVG(COALESCE(mc.conversion_percent, 0.00)), 2) AS avg_conversion_percent
+SELECT mn.office, ROUND(AVG(COALESCE(mc.conversion_percent, 0))) AS avg_conversion_percent
   FROM managers_conversion AS mc
        LEFT JOIN managers AS mn ON cast(mc.manager_id as NUMERIC) = mn.id
  GROUP BY mn.office
@@ -136,11 +135,11 @@ SELECT manager_id, call_number
  ----------------------------------------------------------------
  -- 6. Получить для каждого менеджера первое принятое предложение.
  -- Без изменений.
-SELECT mn.name, MIN(to_date(dt, 'DD.MM.YYYY')) AS first_result
-  FROM managers AS mn
-       FULL JOIN upsale AS u ON mn.id = CAST(u.manager_id AS INTEGER)
- WHERE u.result = 'yes'
- GROUP BY mn.name
+ 
+SELECT manager_id, MIN(to_date(dt, 'DD.MM.YYYY')) AS first_result
+  FROM upsale
+ WHERE result = 'yes'
+ GROUP BY manager_id
  ORDER BY first_result;
  
  ---------------------------------------------------------------------------
@@ -168,53 +167,45 @@ SELECT name AS winner
  
 ------------------------------------------------------------------------------------------
 -- 8. Предложить запрос, который покажет интересную или полезную информацию из этих данных.
-
+-- Добавил еще данных за 3-5 месяцы, для демонстрации скрипта. Сам скрипт сократил на 20 строк, убрал ненужные сортировки и другие излишки.
 
 /*
 Суть запроса: определяем сотрудника месяца. На каждый месяц рассчитывается количество успешных upsalov’ов для каждого менеджера. 
 Сотрудником месяца становится тот, кто набрал больше всего. 
 В случае, если есть 2 и больше таких сотрудников (например, 3 человека сделали по 10 успешных upsal’ов каждый), 
-выбирается тот, чья конверсия в этом месяце выше, остальные тоже получают вознаграждение, но меньше (для этого в таблице есть ранкинг). 
+они отсортированы по количеству продаж в столбце ранкинг. 
 При желании можно вывести и количество сделок, и конверсию, тут только определяется победитель.
 */
 
+INSERT INTO upsale(dt, manager_id, client_id, call_id, factor_id, result) VALUES
+
+('01.03.2017',7,123,3,2,'yes'),
+('03.04.2017',7,90,9,1,'yes'),
+('02.03.2017',4,890,6,2,'no'),
+('01.03.2017',3,67,2,1,'no'),
+('04.03.2017',3,678,11,5,'yes'),
+('03.05.2017',2,123,7,3,'yes'),
+('03.04.2017',2,45,8,2,'no'),
+('01.04.2017',1,45,1,1,'yes'),
+('01.05.2017',1,45,4,4,'no'),
+('04.04.2017',1,893,10,4,'yes');
+
 WITH
-     total_per_month AS 
-    (SELECT mn.id, EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num, COUNT(result) AS total_upsales
-       FROM upsale AS u JOIN managers AS mn ON CAST(u.manager_id AS INTEGER) = mn.id
-      GROUP BY month_num, mn.id),
+     managers_conversion AS
+    (SELECT manager_id,
+     		SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_per_month,
+     		SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) AS positive_per_month,
+     		EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num
+       FROM upsale AS u
+      GROUP BY manager_id, month_num),
+           
+      ranking_per_month AS
+      (SELECT *, 
+              RANK() OVER (PARTITION BY month_num ORDER BY conversion_per_month DESC) AS ranking,
+              RANK() OVER (PARTITION BY month_num ORDER BY conversion_per_month DESC, positive_per_month DESC) AS ranking_final
+       FROM managers_conversion)
 
-     positive_per_month AS
-    (SELECT mn.id, EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num, COUNT(result) AS total_positive
-       FROM upsale AS u JOIN managers AS mn ON CAST(u.manager_id AS INTEGER) = mn.id
-      WHERE result = 'yes'
-      GROUP BY month_num, mn.id),
-      
-     positive_and_total AS
-    (SELECT pmp.id, pmp.month_num, pmp.total_positive, tpm.total_upsales
-       FROM positive_per_month AS pmp 
-     	    JOIN total_per_month AS tpm ON pmp.id = tpm.id),
-	
-     conversion_per_month AS
-    (SELECT mn.name, pat.month_num, pat.total_positive, ROUND(CAST(pat.total_positive * 100 AS numeric) / CAST(pat.total_upsales AS numeric), 2) AS conversion_percent
-       FROM positive_and_total AS pat
-            JOIN managers AS mn ON mn.id = pat.id),
-
-     max_per_month AS  
-    (SELECT month_num, MAX(total_positive) AS max_positive
-       FROM positive_per_month AS ppm
-      GROUP BY month_num),
-	
-     best_per_month AS 
-    (SELECT cpm.name, cpm.month_num, cpm.total_positive, cpm.conversion_percent, RANK() OVER (ORDER BY cpm.conversion_percent DESC) AS ranking
-       FROM conversion_per_month AS cpm, max_per_month AS mpm
-      WHERE cpm.total_positive = mpm.max_positive 
-	    AND cpm.month_num = mpm.month_num 
-      GROUP BY cpm.name, cpm.month_num, cpm.total_positive, cpm.conversion_percent)
-       
-       
- SELECT bpm.name, bpm.ranking, TO_CHAR(TO_DATE(bpm.month_num::TEXT, 'MM'), 'Month') AS month_name
-   FROM best_per_month AS bpm
-        JOIN managers AS mn ON bpm.name = mn.name
-  ORDER BY bpm.month_num, bpm.ranking;
- 
+        
+SELECT manager_id, ranking_final, month_num
+FROM ranking_per_month
+WHERE ranking = 1;
