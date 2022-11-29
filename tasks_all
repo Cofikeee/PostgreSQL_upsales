@@ -193,9 +193,9 @@ INSERT INTO upsale(dt, manager_id, client_id, call_id, factor_id, result) VALUES
 WITH
      managers_conversion AS
     (SELECT manager_id,
-     		SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_per_month,
-     		SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) AS positive_per_month,
-     		EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num
+     	    SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_per_month,
+     	    SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) AS positive_per_month,
+     	    EXTRACT(MONTH FROM to_date(dt, 'DD.MM.YYYY')) AS month_num
        FROM upsale AS u
       GROUP BY manager_id, month_num),
            
@@ -207,5 +207,5 @@ WITH
 
         
 SELECT manager_id, ranking_final, month_num
-FROM ranking_per_month
-WHERE ranking = 1;
+  FROM ranking_per_month
+ WHERE ranking = 1;
