@@ -1,14 +1,13 @@
  -- 4. Вывести офисы, отсортированные в порядке убывания средней конверсии менеджеров из офиса за всю историю.
 
-WITH CTE AS
-(
-SELECT u.manager_id,  SUM(CASE WHEN result = 'yes' THEN 1 ELSE 0 END) * 100 / COUNT(result) AS conversion_percent
-  FROM  upsale AS u
- GROUP BY u.manager_id
-)
-
-SELECT mn.office, ROUND(AVG(COALESCE(cte.conversion_percent, 0.00)), 2) AS avg_conversion_percent
-  FROM CTE
-       LEFT JOIN managers AS mn ON CAST(CTE.MANAGER_ID AS INTEGER) = mn.id
- GROUP BY mn.office
- ORDER BY avg_conversion_percent DESC;
+WITH
+     result_table AS  
+    (SELECT manager_id, to_date(dt, 'DD.MM.YYYY'), result,
+	        ROW_NUMBER() OVER w AS call_number,
+       	    LAG(result) OVER w AS previous_result
+	 FROM upsale 
+	 WINDOW w as (PARTITION BY manager_id ORDER BY to_date(dt, 'DD.MM.YYYY')))
+        
+SELECT manager_id, call_number
+  FROM result_table
+ WHERE result = 'yes' AND previous_result = 'no';
