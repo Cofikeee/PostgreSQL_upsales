@@ -55,11 +55,11 @@ COMMIT;
 
 -------------------------------------------------------------------------------
 -- 1. Отобразить сколько предложений сделал каждый из менеджеров за всю историю.
--- Убрал JOIN с менеджерами.
 
-SELECT manager_id, COUNT(id) AS upsale_total
-  FROM upsale
- GROUP BY manager_id
+SELECT mn.name, COUNT(u.id) AS upsale_total
+  FROM upsale AS u
+       FULL JOIN managers AS mn ON mn.id = CAST(u.manager_id AS INTEGER)
+ GROUP BY mn.name
  ORDER BY upsale_total DESC;
  
  -----------------------------------------------------------------------------------------------
